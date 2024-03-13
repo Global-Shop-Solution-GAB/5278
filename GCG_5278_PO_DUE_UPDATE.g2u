@@ -1,0 +1,341 @@
+﻿Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+f.Intrinsic.Control.Try
+v.Local.sError.Declare
+
+f.Intrinsic.Control.CallSub(checksettings)
+'generate our file list
+
+f.Intrinsic.Control.SelectCase(v.Caller.Switches)
+	f.Intrinsic.Control.Case("M")
+		f.Intrinsic.Control.CallSub(loadfile)
+	f.Intrinsic.Control.Case("A")
+		f.Intrinsic.UI.InvokeWaitDialog("Getting Files..")
+		f.Intrinsic.Control.CallSub(autoload)
+	f.Intrinsic.Control.CaseElse
+		f.Intrinsic.Control.CallSub(autoload)
+f.Intrinsic.Control.EndSelect
+
+'files are loaded and parsed, now we save a distinct set of data to a custom table to execute an update query
+f.Intrinsic.Control.CallSub(save_and_update)
+
+f.Intrinsic.Control.CallSub(makelogfile,"STATUS","END")
+
+f.Intrinsic.Control.CallSub(unload,"FILE",V.Args.FILE)
+
+F.Intrinsic.Control.ExitSub
+
+f.Intrinsic.Control.catch
+f.Intrinsic.Control.CallSub(catching,"sub",v.Ambient.CurrentSubroutine,"errorno",v.Ambient.ErrorNumber,"errordesc",v.Ambient.ErrorDescription)
+f.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.catching.Start
+v.Local.sError.declare(string)
+F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5278_PO_DUE_UPDATE.g2u",V.Ambient.NewLine,v.Args.sub,V.Args.errorno,V.args.errordesc,V.Local.sError)
+f.Intrinsic.UI.Msgbox(v.Local.sError)
+F.Intrinsic.Control.callsub(unload)
+Program.Sub.catching.End
+
+Program.Sub.checksettings.Start
+f.Intrinsic.Control.Try
+v.Local.sError.Declare
+v.Local.sDir.Declare
+v.Local.sSubDir.Declare
+V.Local.bExists.Declare
+
+
+'check to see if the main directory exists
+f.Intrinsic.String.Build("{0}\Custom\5278",v.Caller.GlobalDir,v.Local.sDir)
+f.Intrinsic.File.DirExists(v.Local.sDir,v.Local.bExists)
+'if not, add the main directory and the subdirectories
+f.Intrinsic.Control.If(v.Local.bExists,=,False)
+	f.Intrinsic.File.CreateDir(v.Local.sDir)
+	f.Intrinsic.String.Build("{0}\Processed",v.Local.sDir,v.Local.sSubDir)
+	f.Intrinsic.File.CreateDir(v.Local.sSubDir)
+	f.Intrinsic.String.Build("{0}\Errors",v.Local.sDir,v.Local.sSubDir)
+	f.Intrinsic.File.CreateDir(v.Local.sSubDir)
+	f.Intrinsic.String.Build("{0}\Logs",v.Local.sDir,v.Local.sSubDir)
+	f.Intrinsic.File.CreateDir(v.Local.sSubDir)
+f.Intrinsic.Control.EndIf
+
+
+F.Intrinsic.Control.ExitSub
+
+f.Intrinsic.Control.catch
+f.Intrinsic.Control.CallSub(catching,"sub",v.Ambient.CurrentSubroutine,"errorno",v.Ambient.ErrorNumber,"errordesc",v.Ambient.ErrorDescription)
+f.Intrinsic.Control.EndTry
+Program.Sub.checksettings.End
+
+Program.Sub.unload.Start
+f.Intrinsic.Control.Try
+v.Local.sError.Declare
+v.Local.bFile.Declare
+
+F.Intrinsic.Variable.ArgExists("FILE",v.Local.bFile)
+
+f.Intrinsic.Control.If(v.Local.bFile)
+	F.Intrinsic.Control.If(V.Caller.Switches,=,"M",or,v.Caller.Switches,=,"A")
+		f.Intrinsic.Task.ShellExec(0,"open",v.Args.FILE,"","",1)
+	F.Intrinsic.Control.EndIf
+f.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.End
+
+f.Intrinsic.Control.catch
+f.Intrinsic.Control.CallSub(catching,"sub",v.Ambient.CurrentSubroutine,"errorno",v.Ambient.ErrorNumber,"errordesc",v.Ambient.ErrorDescription)
+f.Intrinsic.Control.EndTry
+Program.Sub.unload.End
+
+Program.Sub.autoload.Start
+f.Intrinsic.Control.Try
+v.Local.sError.Declare
+v.Local.sDir.Declare
+v.Local.sFiles.Declare
+v.Local.iCount.Declare
+v.Local.sFile.Declare
+v.Local.sStatus.Declare
+v.Local.iFile.Declare
+
+'auto load is looking at a specific folder for existing files
+f.Intrinsic.String.Build("{0}\custom\5278\",v.Caller.GlobalDir,v.Local.sDir)
+f.Intrinsic.File.GetFileList(v.Local.sDir,v.Local.sFiles)
+
+f.Intrinsic.String.Split(v.Local.sFiles,":",v.Local.sFiles)
+'display status
+f.Intrinsic.String.Build("Found {0} files.",v.Local.sFiles.UBound++,v.Local.sStatus)
+f.Intrinsic.UI.ChangeWaitStatus(v.Local.sStatus)
+
+f.Intrinsic.Control.If(v.Local.sFiles.IsNotNullOrWhiteSpace)
+	f.Intrinsic.Control.CallSub(makelogfile, "STATUS", "CREATE")
+	f.Intrinsic.Control.For(v.Local.iCount,0,v.Local.sFiles.UBound,1)
+		f.Intrinsic.Math.Add(v.Local.iCount,1,v.Local.iFile)
+		f.Intrinsic.String.Build("Parsing file {0} of {1}",v.Local.iFile,v.Local.sFiles.UBound++,v.Local.sStatus)
+		f.Intrinsic.UI.ChangeWaitStatus(v.Local.sStatus,v.Local.iCount.plus1,0,v.Local.sFiles.UBound)
+		'add to the log we are starting a new file
+		f.Intrinsic.stringbuilder.appendline("LOG","Begin File: ")
+		f.Intrinsic.String.Build("{0}\{1}",v.Local.sDir,v.Local.sFiles(v.Local.iCount),v.Local.sFile)
+		'identify the file in the log
+		f.Intrinsic.StringBuilder.appendline("LOG","Current File being parsed:  ",v.Local.sFile)
+		'start parsing that file
+		f.Intrinsic.Control.CallSub(parsefile,"FILE",V.Local.sFile)
+		'move the file
+		f.Intrinsic.Control.CallSub(movefile,"FILE",v.Local.sFile)
+		'the file has been processed and moved - add end point to the log
+		f.Intrinsic.stringbuilder.appendline("LOG","End File",)
+	f.Intrinsic.Control.Next(v.Local.iCount)
+f.Intrinsic.Control.Else
+	f.Intrinsic.Control.CallSub(unload)
+f.Intrinsic.Control.EndIf
+
+'all files have been parsed, create a view so we can move on to the next step
+f.Data.DataView.Create("PODATES","dvPODates",22,"PO > '0' AND VR_SHIP_DATE IS NOT NULL ","")
+
+F.Intrinsic.Control.ExitSub
+
+f.Intrinsic.Control.catch
+f.Intrinsic.Control.CallSub(catching,"sub",v.Ambient.CurrentSubroutine,"errorno",v.Ambient.ErrorNumber,"errordesc",v.Ambient.ErrorDescription)
+f.Intrinsic.Control.EndTry
+Program.Sub.autoload.End
+
+Program.Sub.parsefile.Start
+f.Intrinsic.Control.Try
+v.Local.sError.Declare
+v.Local.sFile.Declare
+v.Local.sSheets.Declare
+v.Local.sRows.Declare
+V.Local.sColumns.Declare
+V.Local.sDataTypes.Declare
+v.Local.sParams.Declare
+v.Local.iCount.Declare(Long,0)
+v.Local.dDate.Declare
+v.Local.iError.Declare(Long,0)
+v.Local.iGood.Declare(Long,0)
+
+V.Local.sColumns.Set("NAME*!*VENDOR*!*ORDER_DATE*!*PO*!*LINE*!*PART*!*DESCRIPTION*!*QTY_ORDERED*!*QTY_RECEIVED*!*BALANCE_DUE*!*COST*!*EXTENSION*!*SHIP_DATE*!*DUE_DATE*!*VR_SHIP_DATE*!*REMARK*!*VR_DELIVERY")
+v.Local.sDataTypes.Set("STRING*!*STRING*!*STRING*!*STRING*!*STRING*!*STRING*!*STRING*!*STRING*!*STRING*!*STRING*!*STRING*!*STRING*!*STRING*!*STRING*!*DATE*!*STRING*!*DATE")
+'read in the spreadsheet
+f.Automation.MSExcel.ReadSpreadsheet(v.Args.FILE,17,500,v.Local.sFile)
+'split each sheet
+f.Intrinsic.String.Split(v.Local.sFile,"&^&",v.Local.sSheets)
+'split sheet0 in to rows
+f.Intrinsic.String.Split(v.Local.sSheets(0),"$!$",v.Local.sRows)
+'row 0 will have the titles in it
+'v.Local.sColumns.Set(v.Local.sRows(0))
+f.Intrinsic.Control.If(v.DataTable.PODATES.Exists,=,False)
+	f.Data.DataTable.CreateFromString("PODATES","",v.Local.sColumns,v.Local.sDataTypes,"*!*","$!$",True)	
+f.Intrinsic.Control.EndIf
+
+
+
+'put the remaining rows back together
+V.Local.iCount.Set(1)
+F.Intrinsic.String.Split(v.Local.sRows(v.Local.iCount),"*!*",v.Local.sParams)
+F.Intrinsic.Control.DoUntil(V.Local.sParams(0).IsNullOrWhiteSpace)
+	f.Intrinsic.Control.If(v.Local.sParams(14).IsNotNullOrWhiteSpace)
+		f.Intrinsic.Date.DateAdd("D",40,v.Local.sParams(14).Date,v.Local.dDate)
+		F.Data.DataTable.AddRowByMap("PODATES",v.Local.sColumns,v.Local.sParams(0),v.Local.sParams(1),v.Local.sParams(2),v.Local.sParams(3),v.Local.sParams(4),v.Local.sParams(5),v.Local.sParams(6),v.Local.sParams(7),v.Local.sParams(8),v.Local.sParams(9),v.Local.sParams(10),v.Local.sParams(11),v.Local.sParams(12),v.Local.sParams(13),v.Local.sParams(14),"",V.Local.dDate)
+	f.Intrinsic.Control.Else
+		'logging bad rows of data generally caused by an invalid due date
+		F.Intrinsic.StringBuilder.AppendLine("LOG","Record number:  ",v.Local.iCount,v.Ambient.Tab,"Missing or bad Vendor Ship Date",v.Ambient.NewLine,"Record Reads as follows:",v.Ambient.NewLine,v.Local.sRows(v.Local.iCount))
+		f.Intrinsic.Math.Add(v.Local.iError,1,v.Local.iError)
+	f.Intrinsic.Control.EndIf
+	f.Intrinsic.Math.Add(v.Local.iCount,1,v.Local.iCount)
+	f.Intrinsic.String.Split(v.Local.sRows(v.Local.iCount),"*!*",v.Local.sParams)
+f.Intrinsic.Control.Loop
+
+f.Intrinsic.Math.Sub(v.Local.iCount,v.Local.iError,v.Local.iGood)
+'identify the number of records processed, good, and bad
+'adjust the values of icount and igood because of iteration (it will always be 1 higher than it should be)
+F.Intrinsic.Math.Sub(V.Local.iCount,1,V.Local.iCount)
+F.Intrinsic.Math.Sub(V.Local.iGood,1,V.Local.iGood)
+F.Intrinsic.StringBuilder.AppendLine("LOG",V.Local.iCount," Lines processed in this file",v.Ambient.NewLine,v.Local.iGood," successful rows processed",v.Ambient.NewLine,v.Local.iError," lines in error")
+
+
+F.Intrinsic.Control.ExitSub
+
+f.Intrinsic.Control.catch
+f.Intrinsic.Control.CallSub(catching,"sub",v.Ambient.CurrentSubroutine,"errorno",v.Ambient.ErrorNumber,"errordesc",v.Ambient.ErrorDescription)
+f.Intrinsic.Control.EndTry
+Program.Sub.parsefile.End
+
+Program.Sub.makelogfile.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare
+v.Local.sData.Declare
+v.local.sFile.Declare
+v.Local.sDate.Declare
+
+
+f.Intrinsic.Control.If(v.Args.STATUS,=,"CREATE")
+	f.Intrinsic.StringBuilder.Create("LOG")
+	f.Intrinsic.stringBuilder.AppendLine("LOG","BEGIN LOG")
+f.Intrinsic.Control.Else
+	f.Intrinsic.UI.ChangeWaitStatus("Complete!  Writing Log.")
+	F.Intrinsic.StringBuilder.AppendLine("LOG","END LOG FILE")
+	f.Intrinsic.String.Format(v.Ambient.Date,"YYYYMMDD",V.Local.sDate)
+	f.Intrinsic.String.Build("{0}\custom\5278\Logs\{1}{2}-{3}.txt",v.Caller.GlobalDir,v.Caller.User.Trim,v.Caller.CompanyCode,v.Local.sDate,v.Local.sFile)
+	f.Intrinsic.StringBuilder.ToString("LOG",v.Local.sData)
+	f.Intrinsic.File.String2File(v.Local.sFile,v.Local.sData)
+	F.Intrinsic.Variable.AddRV("FILE",V.Local.sFile)
+f.Intrinsic.Control.endif
+
+F.Intrinsic.Control.ExitSub
+
+f.Intrinsic.Control.catch
+f.Intrinsic.Control.CallSub(catching,"sub",v.Ambient.CurrentSubroutine,"errorno",v.Ambient.ErrorNumber,"errordesc",v.Ambient.ErrorDescription)
+f.Intrinsic.Control.EndTry
+Program.Sub.makelogfile.End
+
+Program.Sub.loadfile.Start
+f.Intrinsic.Control.Try
+v.Local.sError.Declare
+v.Local.sRet.Declare
+
+'open a file browser to select the file we want to parse
+
+f.Intrinsic.UI.ShowOpenFileDialog(v.Caller.GlobalDir,"*!*","",v.Local.sRet)
+
+f.Intrinsic.Control.If(v.Local.sRet,<>,v.Ambient.cancel)
+	f.Intrinsic.Control.CallSub(makelogfile, "STATUS", "CREATE")
+	'add to the log we are starting a new file
+	f.Intrinsic.stringbuilder.AppendLine("LOG","Begin File: ",V.Ambient.NewLine,"Current File being parsed:  ",v.Local.sRet)
+	'start parsing that file
+	f.Intrinsic.Control.CallSub(parsefile,"FILE",V.Local.sRet)
+	'move the file
+	f.Intrinsic.Control.CallSub(movefile,"FILE",v.Local.sRet)
+	'the file has been processed and moved - add end point to the log
+	f.Intrinsic.stringbuilder.AppendLine("LOG","End File")
+
+
+	'all files have been parsed, create a view so we can move on to the next step
+	f.Data.DataView.Create("PODATES","dvPODates",22,"PO > '0' AND VR_SHIP_DATE IS NOT NULL ","")
+
+f.Intrinsic.Control.Else
+	f.Intrinsic.Control.CallSub(unload)
+
+f.Intrinsic.Control.EndIf
+
+
+f.Intrinsic.Control.catch
+f.Intrinsic.Control.CallSub(catching,"sub",v.Ambient.CurrentSubroutine,"errorno",v.Ambient.ErrorNumber,"errordesc",v.Ambient.ErrorDescription)
+f.Intrinsic.Control.EndTry
+Program.Sub.loadfile.End
+
+Program.Sub.save_and_update.Start
+f.Intrinsic.Control.Try
+v.Local.sError.Declare
+v.Local.sData.Declare
+V.Local.sSql.Declare
+V.Local.iCount.Declare
+
+f.Intrinsic.UI.ChangeWaitStatus("Updating core data",33,0,100)
+'take the dataview that we have and save it to a unique datatable with limited columns
+f.Data.DataView.ToDataTableDistinct("PODATES","dvPODates","UPLOAD","PO*!*LINE*!*VR_SHIP_DATE*!*VR_DELIVERY",True)
+
+
+f.Intrinsic.Control.For(v.Local.iCount,0,v.DataTable.upload.RowCount--,1)
+	f.Data.Datatable.SetValue("UPLOAD",V.Local.iCount,"LINE" , F.Intrinsic.String.Build("{0}0",V.DataTable.UPLOAD(V.Local.iCount).LINE!FIELDVALTRIM))
+f.Intrinsic.Control.Next(v.Local.iCount)
+
+'convert the two date columns to strings to match up with GSS tables
+f.Data.DataTable.AddColumn("UPLOAD","L_SHIP_DATE","STRING")
+F.Data.DataTable.AddColumn("UPLOAD","L_DUE_DATE","STRING")
+f.Data.DataTable.AddColumn("UPLOAD","DATE_DUE_LINE","STRING")
+F.Data.DataTable.SetValueFormat("UPLOAD",-1,"VR_SHIP_DATE","L_SHIP_DATE","YYYYMMDD")
+F.Data.DataTable.SetValueFormat("UPLOAD",-1,"VR_DELIVERY","L_DUE_DATE","YYYYMMDD")
+F.Data.DataTable.SetValueFormat("UPLOAD",-1,"VR_DELIVERY","DATE_DUE_LINE","MMDDYY")
+
+'open a connection to the database
+f.ODBC.Connection!coredb.opencompanyconnection
+'make sure the temp table is empty
+f.ODBC.Connection!coredb.execute("delete from GCG_5278_POUPDATE")
+'save the data
+f.Intrinsic.UI.ChangeWaitStatus("Updating core data",66,0,100)
+f.Data.DataTable.SaveToDB("UPLOAD","COREDB","GCG_5278_POUPDATE","PO*!*LINE",128,"PO@!@PO*!*LINE@!@LINE*!*L_SHIP_DATE@!@L_SHIP_DATE*!*L_DUE_DATE@!@L_DUE_DATE*!*DATE_DUE_LINE@!@DATE_DUE_LINE")
+
+'last we need to run an update query that will update PO Lines with the new dates we've loaded
+V.Local.sSql.Set("UPDATE PO_LINES SET PO_LINES.DATE_DUE_LINE = GCG_5278_POUPDATE.DATE_DUE_LINE, PO_LINES.DUE_DATE_L = GCG_5278_POUPDATE.L_DUE_DATE, PO_LINES.SHIP_DATE_L = GCG_5278_POUPDATE.L_SHIP_DATE FROM PO_LINES INNER JOIN GCG_5278_POUPDATE ON PO_LINES.PURCHASE_ORDER= GCG_5278_POUPDATE.PO AND PO_LINES.RECORD_NO = GCG_5278_POUPDATE.LINE")
+F.ODBC.Connection!COREDB.Execute(v.Local.sSql)
+
+f.Intrinsic.UI.ChangeWaitStatus("Updating core data",100,0,100)
+
+F.Intrinsic.Control.ExitSub
+
+f.Intrinsic.Control.catch
+f.Intrinsic.Control.CallSub(catching,"sub",v.Ambient.CurrentSubroutine,"errorno",v.Ambient.ErrorNumber,"errordesc",v.Ambient.ErrorDescription)
+f.Intrinsic.Control.EndTry
+Program.Sub.save_and_update.End
+
+Program.Sub.movefile.Start
+f.Intrinsic.Control.Try
+v.Local.sError.Declare
+v.Local.sDestination.Declare
+v.Local.sSource.Declare
+v.Local.sFile.Declare
+v.Local.iRet.Declare
+
+
+f.Intrinsic.File.GetPathFromFQN(v.Args.FILE,V.Local.sSource)
+F.Intrinsic.File.GetFileNameFromFQN(V.Args.FILE,V.Local.sFile)
+F.Intrinsic.String.Build("{0}\Custom\5278\Processed\{1}",v.Caller.GlobalDir,v.Local.sFile,v.Local.sDestination)
+f.Intrinsic.File.MoveFile(v.Args.FILE,V.Local.sDestination,V.Local.iRet)
+f.Intrinsic.Control.If(v.Local.iRet,=,1)
+	f.Intrinsic.stringbuilder.appendline("LOG","File moved to:  ",v.Local.sDestination)
+f.Intrinsic.Control.Else
+	f.Intrinsic.stringbuilder.appendline("LOG","ERROR:",V.Ambient.NewLine,"FAILED TO MOVE FILE",V.Ambient.NewLine,V.Local.sSource,V.Ambient.NewLine,"ERROR:")
+f.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+f.Intrinsic.Control.catch
+f.Intrinsic.Control.CallSub(catching,"sub",v.Ambient.CurrentSubroutine,"errorno",v.Ambient.ErrorNumber,"errordesc",v.Ambient.ErrorDescription)
+f.Intrinsic.Control.EndTry
+Program.Sub.movefile.End
+
+Program.Sub.Comments.Start
+${$5$}$2.0.0.0$}$2
+${$6$}$dfinch$}$20220427160243180$}$2O16bu3pcn8yPLUxA6F2Klx+ibLK1MdjCTR0u1N8l8Z6CL4jaU/dDuZQFf0cNX3TurnY7xGplpA=
+Program.Sub.Comments.End
